@@ -10,8 +10,6 @@ from __future__ import annotations
 import os
 from typing import Protocol
 
-import httpx
-
 Message = dict[str, str]  # {"role": ..., "content": ...}
 
 
@@ -55,6 +53,8 @@ class OpenAICompatibleLLM:
         self._timeout = timeout
 
     def complete(self, messages: list[Message]) -> str:
+        import httpx  # lazy: keeps the Temporal workflow sandbox httpx-free
+
         resp = httpx.post(
             f"{self._base_url}/chat/completions",
             headers={"Authorization": f"Bearer {self._api_key}"},
