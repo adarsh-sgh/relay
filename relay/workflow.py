@@ -2,7 +2,8 @@
 
 Each stage (plan, execute step, synthesize) is an activity with a retry
 policy, so transient LLM/tool failures are retried and completed state is
-never re-executed after a worker crash.
+never re-executed after a worker crash. An approval signal gates execution
+between planning and running the plan (human-in-the-loop).
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ _RETRY = RetryPolicy(
 @dataclass
 class PipelineInput:
     task: str
+    require_approval: bool = True
 
 
 class AgentActivities:
@@ -97,10 +99,15 @@ class AgentActivities:
 
 @workflow.defn
 class AgentPipeline:
-    """Durable pipeline: plan -> execute -> synthesize."""
+    """Durable pipeline: plan -> [await approval] -> execute -> synthesize."""
+
+    def __init__(self) -> None:
+        self._status = "starting"
+        self._decision: str | None = None
 
     @workflow.run
     async def run(self, input: PipelineInput) -> dict:
+        self._status = "planning"
         plan = await workflow.execute_activity(
             AgentActivities.plan,
             input.task,
@@ -108,6 +115,14 @@ class AgentPipeline:
             retry_policy=_RETRY,
         )
 
+        if input.require_approval:
+            self._status = "awaiting_approval"
+            await workflow.wait_condition(lambda: self._decision is not None)
+            if self._decision == "reject":
+                self._status = "rejected"
+                return {"status": "rejected", "plan": plan}
+
+        self._status = "executing"
         results = []
         for step in plan["steps"]:
             results.append(
@@ -119,6 +134,7 @@ class AgentPipeline:
                 )
             )
 
+        self._status = "synthesizing"
         answer = await workflow.execute_activity(
             AgentActivities.synthesize,
             [input.task, results],
@@ -126,4 +142,17 @@ class AgentPipeline:
             retry_policy=_RETRY,
         )
 
+        self._status = "completed"
         return {"status": "completed", "plan": plan, "results": results, "answer": answer}
+
+    @workflow.signal
+    def approve(self) -> None:
+        self._decision = "approve"
+
+    @workflow.signal
+    def reject(self) -> None:
+        self._decision = "reject"
+
+    @workflow.query
+    def status(self) -> str:
+        return self._status
