@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package relay.v1;
+
+option go_package = "github.com/adarsh-sgh/relay/go-client/relaypb";
+
+// Control plane for durable agent pipelines. The Python server proxies
+// these calls to Temporal (start / query / signal).
+service RelayControl {
+  rpc StartRun(StartRunRequest) returns (StartRunReply);
+  rpc GetStatus(StatusRequest) returns (StatusReply);
+  rpc Approve(ApproveRequest) returns (ApproveReply);
+}
+
+message StartRunRequest {
+  string task = 1;
+  bool require_approval = 2;
+}
+
+message StartRunReply {
+  string workflow_id = 1;
+}
+
+message StatusRequest {
+  string workflow_id = 1;
+}
+
+message StatusReply {
+  string status = 1;
+}
+
+message ApproveRequest {
+  string workflow_id = 1;
+  bool reject = 2;
+}
+
+message ApproveReply {
+  string status = 1;
+}
