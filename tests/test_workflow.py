@@ -1,6 +1,7 @@
 """Durable-execution tests against Temporal's time-skipping test server.
 
-Covers the full pipeline with human-in-the-loop approval and rejection.
+Covers: full pipeline with human-in-the-loop approval, activity failure
+injection (retries), and durability across a worker restart mid-workflow.
 """
 
 import asyncio
@@ -13,6 +14,22 @@ from temporalio.worker import Worker
 
 from relay.demo import DemoLLM
 from relay.workflow import TASK_QUEUE, AgentActivities, AgentPipeline, PipelineInput
+
+
+class FlakyLLM:
+    """Fails the first `failures` calls, then delegates to DemoLLM."""
+
+    def __init__(self, failures: int):
+        self.remaining = failures
+        self.total_failures = 0
+        self._inner = DemoLLM()
+
+    def complete(self, messages):
+        if self.remaining > 0:
+            self.remaining -= 1
+            self.total_failures += 1
+            raise RuntimeError("injected LLM outage")
+        return self._inner.complete(messages)
 
 
 @pytest.fixture
@@ -29,6 +46,9 @@ def make_worker(client: Client, llm) -> Worker:
         task_queue=TASK_QUEUE,
         workflows=[AgentPipeline],
         activities=[acts.plan, acts.execute_step, acts.synthesize],
+        # no sticky queue: lets a fresh worker pick up a workflow left behind
+        # by a dead one immediately (see worker-restart test)
+        max_cached_workflows=0,
     )
 
 
@@ -66,3 +86,31 @@ async def test_reject_stops_pipeline(env: WorkflowEnvironment):
 
     assert result["status"] == "rejected"
     assert "answer" not in result
+
+
+async def test_activity_failure_injection_is_retried(env: WorkflowEnvironment):
+    flaky = FlakyLLM(failures=2)  # plan activity fails twice, retry policy covers it
+    async with make_worker(env.client, flaky):
+        handle = await start_and_wait_for_approval(env.client)
+        await handle.signal(AgentPipeline.approve)
+        result = await handle.result()
+
+    assert flaky.total_failures == 2
+    assert result["status"] == "completed"
+    assert result["results"][0]["output"] == "42"
+
+
+async def test_workflow_survives_worker_restart(env: WorkflowEnvironment):
+    # worker 1 plans, then dies while the workflow is paused for approval
+    async with make_worker(env.client, DemoLLM()):
+        handle = await start_and_wait_for_approval(env.client)
+
+    # no worker alive; workflow state lives in the server
+    await handle.signal(AgentPipeline.approve)
+
+    # a fresh worker process picks the workflow back up and finishes it
+    async with make_worker(env.client, DemoLLM()):
+        result = await handle.result()
+
+    assert result["status"] == "completed"
+    assert result["results"][0]["output"] == "42"

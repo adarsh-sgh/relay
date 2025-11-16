@@ -46,7 +46,8 @@ no-ops when keys are absent.
 
 - **Durable execution** — each pipeline stage is a Temporal activity with a
   retry policy. Completed stages are never re-run; if the worker dies
-  mid-pipeline, a fresh worker resumes from history.
+  mid-pipeline, a fresh worker resumes from history
+  (`tests/test_workflow.py::test_workflow_survives_worker_restart`).
 - **LangGraph orchestration** — a plan / execute / validate graph with a
   conditional edge that routes low-confidence answers back to planning.
 - **Schema-validated self-correction** — LLM output must parse into a
@@ -105,7 +106,8 @@ pytest
 
 Broad end-to-end tests with a mocked LLM: the self-correction loop, the
 full graph run, and — against Temporal's time-skipping test server —
-approval/rejection flows and the gRPC flow. First run downloads the
+approval/rejection flows, injected activity failures retried to success,
+worker-restart durability, and the gRPC flow. First run downloads the
 Temporal test server binary.
 
 ## Layout
