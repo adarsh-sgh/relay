@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "relay-agent"
-version = "0.3.0"
-description = "Durable LLM-agent workflow engine: Temporal for durability, LangGraph for orchestration, schema-validated self-correction, Langfuse tracing."
+version = "0.4.0"
+description = "Durable LLM-agent workflow engine: Temporal for durability, LangGraph for orchestration, schema-validated self-correction, Langfuse tracing, templates + operator console with audit trail and SLO metrics."
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Adarsh Singh" }]
@@ -16,10 +16,12 @@ dependencies = [
     "pydantic>=2.6",
     "httpx>=0.27",
     "grpcio>=1.60",
+    "fastapi>=0.110",
 ]
 
 [project.optional-dependencies]
 langfuse = ["langfuse>=2.50"]
+console = ["uvicorn>=0.29"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23", "grpcio-tools>=1.60"]
 
 [tool.setuptools.packages.find]
