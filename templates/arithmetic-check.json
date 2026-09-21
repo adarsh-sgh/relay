@@ -1,0 +1,12 @@
+{
+  "name": "arithmetic-check",
+  "title": "Arithmetic check",
+  "description": "Evaluate an expression with the calc tool and report the result. Requires approval of the plan before any step runs.",
+  "owner": "platform-team@example.com",
+  "task": "compute {expression} and report",
+  "params": [
+    {"name": "expression", "description": "Arithmetic expression, e.g. 6*7"}
+  ],
+  "require_approval": true,
+  "slo": {"success_rate": 0.99, "p95_step_latency_ms": 2000}
+}

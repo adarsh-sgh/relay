@@ -1,0 +1,13 @@
+{
+  "name": "daily-digest",
+  "title": "Daily digest",
+  "description": "Summarise notes for a team into a short digest. Auto-runs without approval; low-risk, no side effects.",
+  "owner": "ops-tooling@example.com",
+  "task": "write a {length} digest of today's notes for {team}",
+  "params": [
+    {"name": "team", "description": "Team the digest is for"},
+    {"name": "length", "description": "short or long", "required": false, "default": "short"}
+  ],
+  "require_approval": false,
+  "slo": {"success_rate": 0.95, "p95_step_latency_ms": 5000}
+}
